@@ -2,7 +2,7 @@ name: Sync Upstream to Staging
 
 on:
   schedule:
-    - cron: '10 14 * * *' # Runs daily at midnight
+    - cron: '0 0 * * *' # Runs daily at midnight
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -26,8 +26,8 @@ jobs:
     - name: Fetch upstream changes
       run: git fetch upstream
 
-    - name: Checkout a branch for syncing
-      run: git checkout -b sync-repo
+    - name: Checkout staging branch
+      run: git checkout staging
 
     - name: Merge upstream changes excluding Dockerfile
       run: |
