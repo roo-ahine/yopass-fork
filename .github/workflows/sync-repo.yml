@@ -10,42 +10,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Git
-      run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      - name: Set up Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-    - name: Add upstream remote
-      run: git remote add upstream https://github.com/jhaals/yopass.git
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/jhaals/yopass.git
 
-    - name: Fetch upstream changes
-      run: git fetch upstream
+      - name: Fetch upstream changes
+        run: git fetch upstream
 
-    - name: Checkout new branch
-      run: |
-        git checkout -b sync-upstream
+      - name: Checkout new branch
+        run: |
+          git checkout -b sync-upstream
 
-    - name: Merge upstream changes excluding Dockerfile
-      run: |
-        git merge upstream/master --no-commit --no-ff
-        git reset HEAD Dockerfile
-        git checkout -- Dockerfile
-        git commit -m "Merge upstream changes excluding Dockerfile"
+      - name: Merge upstream changes excluding Dockerfile
+        run: |
+          git merge upstream/master --no-commit --no-ff
+          git reset HEAD Dockerfile
+          git checkout -- Dockerfile
+          git commit -m "Merge upstream changes excluding Dockerfile"
 
-    - name: Push changes to the new branch
-      run: git push origin sync-upstream
+      - name: Push changes to the new branch
+        run: git push origin sync-upstream
 
-    - name: Create Pull Request
-      uses: peter-evans/create-pull-request@v3
-      with:
-        commit-message: 'Sync with upstream'
-        branch: 'sync-upstream'
-        title: 'Sync with upstream'
-        body: 'This PR keeps the forked repository in sync with the upstream repository.'
-        base: 'staging' # Specify the base branch for the PR
-
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          commit-message: 'Sync with upstream'
+          branch: 'sync-upstream'
+          title: 'Sync with upstream'
+          body: 'This PR keeps the forked repository in sync with the upstream repository.'
+          base: 'staging' # Specify the base branch for the PR
