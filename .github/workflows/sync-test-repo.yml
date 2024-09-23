@@ -1,4 +1,4 @@
-name: Sync Upstream to Staging
+name: Sync Upstream to Staging test 2
 
 on:
   schedule:
@@ -21,10 +21,10 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
       - name: Add upstream remote
-        run: git remote add upstream2 https://github.com/roo-ahine/test.git
+        run: git remote add upstream3 https://github.com/roo-ahine/test.git
 
       - name: Fetch upstream changes
-        run: git fetch upstream2
+        run: git fetch upstream3
 
       - name: Checkout new branch
         run: |
