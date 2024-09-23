@@ -2,7 +2,7 @@ name: Sync Upstream to Staging test 2
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # Runs daily at 9:35 AM UTC
+    - cron: '35 9 * * *' # Runs daily at 9:35 AM UTC
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -47,3 +47,4 @@ jobs:
           branch: 'sync-upstream'
           title: 'Sync with upstream'
           body: 'This PR keeps the forked repository in sync with the upstream repository.'
+          base: staging
