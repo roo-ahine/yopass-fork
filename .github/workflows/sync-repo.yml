@@ -21,11 +21,10 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
       - name: Add upstream remote
-        #run: git remote add upstream https://github.com/jhaals/yopass.git
-        run: git remote add upstream https://github.com/roo-ahine/test.git
+        run: git remote add upstream2 https://github.com/roo-ahine/test.git
 
       - name: Fetch upstream changes
-        run: git fetch upstream
+        run: git fetch upstream2
 
       - name: Checkout new branch
         run: |
