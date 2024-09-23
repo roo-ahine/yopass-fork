@@ -41,10 +41,12 @@ jobs:
         run: git push origin sync-upstream
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v5
         with:
           commit-message: 'Sync with upstream'
-          branch: 'sync-upstream'
           title: 'Sync with upstream'
-          body: 'This PR keeps the forked repository in sync with the upstream repository.'
+          branch: 'sync-upstream'
+          body: >
+            This PR keeps the forked repository in sync with the upstream repository
+          labels: automated pr
           base: staging
