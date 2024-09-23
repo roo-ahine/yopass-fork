@@ -39,3 +39,10 @@ jobs:
     - name: Push changes to the staging branch
       run: git push origin staging
 
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v3
+      with:
+        commit-message: 'Sync with upstream'
+        branch: 'sync-upstream'
+        title: 'Sync with upstream'
+        body: 'This PR keeps the forked repository in sync with the upstream repository.'
