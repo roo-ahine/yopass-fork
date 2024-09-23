@@ -47,4 +47,3 @@ jobs:
           branch: 'sync-upstream'
           title: 'Sync with upstream'
           body: 'This PR keeps the forked repository in sync with the upstream repository.'
-          base: 'staging' # Specify the base branch for the PR
