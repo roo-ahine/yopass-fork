@@ -37,9 +37,6 @@ jobs:
           git checkout -- Dockerfile
           git commit -m "Merge upstream changes excluding Dockerfile"
 
-      - name: Git pull
-        run: git pull
-     
       - name: Push changes to the new branch
         run: git push origin sync-upstream
 
