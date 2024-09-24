@@ -1,0 +1,54 @@
+name: Sync Upstream to Staging test 2
+
+on:
+  schedule:
+    - cron: '35 9 * * *' # Runs daily at 9:35 AM UTC
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Add upstream remote
+        run: git remote add upstream3 https://github.com/roo-ahine/test.git
+
+      - name: Fetch upstream changes
+        run: git fetch upstream3
+
+      - name: Checkout new branch
+        run: |
+          BRANCH_NAME="sync-upstream-$(date +%s)"
+          git checkout -b $BRANCH_NAME
+
+      - name: Merge upstream changes excluding Dockerfile
+        run: |
+          git merge upstream3/main --no-commit --no-ff --allow-unrelated-histories
+          git reset HEAD Dockerfile
+          git checkout -- Dockerfile
+          git commit -m "Merge upstream changes excluding Dockerfile"
+
+      - name: Push changes to the new branch
+        run: |
+          git push origin $BRANCH_NAME
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: 'Sync with upstream'
+          title: 'Sync with upstream'
+          branch: ${{ steps.checkout-new-branch.outputs.BRANCH_NAME }}
+          body: >
+            This PR keeps the forked repository in sync with the upstream repository
+          labels: automated pr
+          base: staging
