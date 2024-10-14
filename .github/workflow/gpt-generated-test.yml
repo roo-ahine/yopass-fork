@@ -1,0 +1,54 @@
+name: GPT generated Sync with Upstream and Create PR
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  sync-and-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # Fetch all history for all branches and tags
+
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+
+    - name: Add upstream remote
+      run: git remote add upstream https://github.com/jhaals/yopass.git
+
+    - name: Fetch upstream master
+      run: git fetch upstream master
+
+    - name: Check for changes in upstream master
+      id: check_changes
+      run: |
+        git fetch upstream master
+        git diff --quiet HEAD..upstream/master || echo "changes"
+
+    - name: Sync with upstream master
+      if: steps.check_changes.outputs.changes == 'changes'
+      run: |
+        git checkout staging
+        git merge --no-commit upstream/master
+        git restore --source=HEAD --staged --worktree Dockerfile .github
+        git commit -m "Merge changes from upstream master, excluding Dockerfile and .github"
+        git push origin staging
+
+    - name: Create Pull Request to master
+      if: steps.check_changes.outputs.changes == 'changes'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: Merge changes from upstream master
+        branch: sync-upstream-master
+        base: master
+        body: |
+          This PR merges changes from the upstream master branch into the master branch, excluding changes to Dockerfile and .github.
+        title: Merge changes from upstream master
