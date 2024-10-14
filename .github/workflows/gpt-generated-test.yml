@@ -1,4 +1,4 @@
-name: GPT generated Sync with Upstream and Create PR
+name: Sync with Upstream and Create PR
 
 on:
   schedule:
@@ -20,7 +20,7 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
 
-    - name: Add upstream remote
+    - name: Add upstream remote # https://github.com/jhaals/yopass.git
       run: git remote add upstream https://github.com/jhaals/yopass.git
 
     - name: Fetch upstream master
@@ -30,10 +30,16 @@ jobs:
       id: check_changes
       run: |
         git fetch upstream master
-        git diff --quiet HEAD..upstream/master || echo "changes"
+        if git diff --quiet HEAD..upstream/master; then
+          echo "no changes"
+          echo "::set-output name=changes::false"
+        else
+          echo "changes detected"
+          echo "::set-output name=changes::true"
+        fi
 
     - name: Sync with upstream master
-      if: steps.check_changes.outputs.changes == 'changes'
+      if: steps.check_changes.outputs.changes == 'true'
       run: |
         git checkout staging
         git merge --no-commit upstream/master
@@ -42,7 +48,7 @@ jobs:
         git push origin staging
 
     - name: Create Pull Request to master
-      if: steps.check_changes.outputs.changes == 'changes'
+      if: steps.check_changes.outputs.changes == 'true'
       uses: peter-evans/create-pull-request@v5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -52,3 +58,4 @@ jobs:
         body: |
           This PR merges changes from the upstream master branch into the master branch, excluding changes to Dockerfile and .github.
         title: Merge changes from upstream master
+
