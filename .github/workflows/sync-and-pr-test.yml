@@ -53,6 +53,9 @@ jobs:
         run: |
           git push origin $BRANCH_NAME
 
+      - name: Check differences
+        run: |
+          git diff master...${{ env.BRANCH_NAME }} || echo "No differences"
       - name: Create Pull Request for master
         uses: peter-evans/create-pull-request@v7
         with:
