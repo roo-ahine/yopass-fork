@@ -44,8 +44,7 @@ jobs:
         git checkout staging
         git merge --no-commit upstream/master
         git restore --source=HEAD --staged --worktree Dockerfile .github
-        git commit -m "Merge changes from upstream master, excluding Dockerfile and .github"
-        git push origin staging
+
 
     - name: Create Pull Request to master
       if: steps.check_changes.outputs.changes == 'true'
