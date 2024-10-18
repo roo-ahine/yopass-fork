@@ -1,15 +1,22 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/jhaals/yopass/pkg/server"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -41,60 +48,65 @@ func init() {
 
 func main() {
 	logger := configureZapLogger()
-
-	var db server.Database
-	switch database := viper.GetString("database"); database {
-	case "memcached":
-		memcached := viper.GetString("memcached")
-		db = server.NewMemcached(memcached)
-		logger.Debug("configured Memcached", zap.String("address", memcached))
-	case "redis":
-		redis := viper.GetString("redis")
-		var err error
-		db, err = server.NewRedis(redis)
-		if err != nil {
-			logger.Fatal("invalid Redis URL", zap.Error(err))
-		}
-		logger.Debug("configured Redis", zap.String("url", redis))
-	default:
-		logger.Fatal("unsupported database, expected 'memcached' or 'redis'", zap.String("database", database))
+	db, err := setupDatabase(logger)
+	if err != nil {
+		logger.Fatal("failed to setup database", zap.Error(err))
 	}
-
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	registry.MustRegister(prometheus.NewGoCollector())
+	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	registry.MustRegister(collectors.NewGoCollector())
 
 	cert := viper.GetString("tls-cert")
 	key := viper.GetString("tls-key")
-	errc := make(chan error)
+	quit := make(chan os.Signal, 1)
 
+	y := server.New(db, viper.GetInt("max-length"), registry, viper.GetBool("force-onetime-secrets"), logger)
+	yopassSrv := &http.Server{
+		Addr:      fmt.Sprintf("%s:%d", viper.GetString("address"), viper.GetInt("port")),
+		Handler:   y.HTTPHandler(),
+		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12},
+	}
 	go func() {
-		addr := fmt.Sprintf("%s:%d", viper.GetString("address"), viper.GetInt("port"))
-		logger.Info("Starting yopass server", zap.String("address", addr))
-		y := server.New(db, viper.GetInt("max-length"), registry, viper.GetBool("force-onetime-secrets"), logger)
-		errc <- listenAndServe(addr, y.HTTPHandler(), cert, key)
+		logger.Info("Starting yopass server", zap.String("address", yopassSrv.Addr))
+		err := listenAndServe(yopassSrv, cert, key)
+		if !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatal("yopass stopped unexpectedly", zap.Error(err))
+		}
 	}()
 
+	metricsServer := &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", viper.GetString("address"), viper.GetInt("metrics-port")),
+		Handler: metricsHandler(registry),
+	}
 	if port := viper.GetInt("metrics-port"); port > 0 {
 		go func() {
-			addr := fmt.Sprintf("%s:%d", viper.GetString("address"), port)
-			logger.Info("Starting yopass metrics server", zap.String("address", addr))
-			errc <- listenAndServe(addr, metricsHandler(registry), cert, key)
+			logger.Info("Starting yopass metrics server", zap.String("address", metricsServer.Addr))
+			err := listenAndServe(metricsServer, cert, key)
+			if !errors.Is(err, http.ErrServerClosed) {
+				logger.Fatal("metrics server stopped unexpectedly", zap.Error(err))
+			}
 		}()
 	}
 
-	err := <-errc
-	logger.Fatal("yopass stopped unexpectedly", zap.Error(err))
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal := <-quit
+	log.Printf("Shutting down HTTP server %s", signal)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := yopassSrv.Shutdown(ctx); err != nil {
+		logger.Fatal("shutdown error: %s", zap.Error(err))
+	}
+	if port := viper.GetInt("metrics-port"); port > 0 {
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			logger.Fatal("shutdown error: %s", zap.Error(err))
+		}
+	}
+	logger.Info("Server shut down")
 }
 
 // listenAndServe starts a HTTP server on the given addr. It uses TLS if both
 // certFile and keyFile are not empty.
-func listenAndServe(addr string, h http.Handler, certFile, keyFile string) error {
-	srv := &http.Server{
-		Addr:      addr,
-		Handler:   h,
-		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12},
-	}
+func listenAndServe(srv *http.Server, certFile string, keyFile string) error {
 	if certFile == "" || keyFile == "" {
 		return srv.ListenAndServe()
 	}
@@ -119,4 +131,25 @@ func configureZapLogger() *zap.Logger {
 	}
 	zap.ReplaceGlobals(logger)
 	return logger
+}
+
+func setupDatabase(logger *zap.Logger) (server.Database, error) {
+	var db server.Database
+	switch database := viper.GetString("database"); database {
+	case "memcached":
+		memcached := viper.GetString("memcached")
+		db = server.NewMemcached(memcached)
+		logger.Debug("configured Memcached", zap.String("address", memcached))
+	case "redis":
+		redis := viper.GetString("redis")
+		var err error
+		db, err = server.NewRedis(redis)
+		if err != nil {
+			return nil, fmt.Errorf("invalid Redis URL: %w", err)
+		}
+		logger.Debug("configured Redis", zap.String("url", redis))
+	default:
+		return nil, fmt.Errorf("unsupported database, expected 'memcached' or 'redis' got '%s'", database)
+	}
+	return db, nil
 }
